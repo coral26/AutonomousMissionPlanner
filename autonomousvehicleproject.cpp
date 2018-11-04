@@ -281,21 +281,20 @@ void AutonomousVehicleProject::exportHypack(const QModelIndex &index)
             QFile outfile(fname);
             if(outfile.open(QFile::WriteOnly))
             {
+                auto lines = tl->getLines();
                 QTextStream outstream(&outfile);
-                outstream << "LNS 1\n";
-                auto waypoints = tl->childItems();
-                outstream << "LIN " << waypoints.size() << "\n";
-                for(auto i: waypoints)
+                outstream.setRealNumberPrecision(8);
+                outstream << "LNS " << lines.length() << "\n";
+                int lineNum = 1;
+                for (auto l: lines)
                 {
-                    const Waypoint *wp = qgraphicsitem_cast<Waypoint const*>(i);
-                    if(wp)
-                    {
-                        auto ll = wp->location();
-                        outstream << "PTS " << ll.latitude() << " " << ll.longitude() << "\n";
-                    }
+                    outstream << "LIN " << l.length() << "\n";
+                    for (auto p:l)
+                        outstream << "PTS " << p.latitude() << " " << p.longitude() << "\n";
+                    outstream << "LNN " << lineNum << "\n";
+                    lineNum++;
+                    outstream << "EOL\n";
                 }
-                outstream << "LNN 1\n";
-                outstream << "EOL\n";
             }
         }
     }
