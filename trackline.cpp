@@ -6,7 +6,6 @@
 #include <QStandardItem>
 #include <QDebug>
 #include "autonomousvehicleproject.h"
-#include <QVector2D>
 #include "backgroundraster.h"
 
 TrackLine::TrackLine(MissionItem *parent) :GeoGraphicsMissionItem(parent)
@@ -24,14 +23,26 @@ void TrackLine::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
     auto children = waypoints();
     if (children.length() > 1)
     {
+        bool selected = false;
+        if(autonomousVehicleProject()->currentSelected() == this)
+            selected = true;
         painter->save();
 
         QPen p;
+        p.setCosmetic(true);
+        
+        if(selected)
+        {
+            p.setColor(Qt::black);
+            p.setWidth(8);
+            painter->setPen(p);
+            painter->drawPath(shape());
+        }
+        
         if(locked())
             p.setColor(m_lockedColor);
         else
             p.setColor(m_unlockedColor);
-        p.setCosmetic(true);
         p.setWidth(3);
         painter->setPen(p);
         painter->drawPath(shape());
@@ -61,28 +72,6 @@ QPainterPath TrackLine::shape() const
         return ret;
     }
     return QGraphicsItem::shape();
-}
-
-void TrackLine::drawArrow(QPainterPath& path, const QPointF& from, const QPointF& to) const
-{
-    qreal scale = 1.0;
-    auto bgr = autonomousVehicleProject()->getBackgroundRaster();
-    if(bgr)
-        scale = 1.0/bgr->mapScale();// scaledPixelSize();
-    //qDebug() << "scale: " << scale;
-    scale = std::max(0.05,scale);
-    
-    path.moveTo(to);
-    QVector2D v(to-from);
-    v.normalize();
-    QVector2D left(-v.y(),v.x());
-    QVector2D right(v.y(),-v.x());
-    QVector2D back = -v;
-    path.lineTo(to+(left+back*2).toPointF()*10*scale);
-    path.moveTo(to);
-    path.lineTo(to+(right+back*2).toPointF()*10*scale);
-    path.moveTo(to);
-    
 }
 
 
@@ -158,8 +147,9 @@ void TrackLine::write(QJsonObject &json) const
 void TrackLine::writeToMissionPlan(QJsonArray& navArray) const
 {
     QJsonObject navItem;
-    QJsonObject pathObject;
-    writeBehaviorsToMissionPlanObject(pathObject);
+    navItem["pathtype"] = "trackline";
+    navItem["type"] = "survey_line";
+    writeBehaviorsToMissionPlanObject(navItem);
     QJsonArray pathNavArray;
     auto children = childItems();
     for(auto child: children)
@@ -167,11 +157,10 @@ void TrackLine::writeToMissionPlan(QJsonArray& navArray) const
         if(child->type() == GeoGraphicsItem::WaypointType)
         {
             Waypoint *wp = qgraphicsitem_cast<Waypoint*>(child);
-            wp->writeToMissionPlan(pathNavArray);
+            wp->writeNavToMissionPlan(pathNavArray);
         }
     }
-    pathObject["nav"] = pathNavArray;
-    navItem["path"] = pathObject;
+    navItem["nav"] = pathNavArray;
     navArray.append(navItem);
 }
 

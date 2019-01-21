@@ -8,6 +8,8 @@
 
 Waypoint::Waypoint(MissionItem *parent) :GeoGraphicsMissionItem(parent), m_internalPositionChangeFlag(false)
 {
+    m_unlockedColor = Qt::darkRed;
+    m_lockedColor = Qt::darkGreen;
 }
 
 QGeoCoordinate const &Waypoint::location() const
@@ -38,7 +40,7 @@ void Waypoint::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, 
     else
         p.setColor(m_unlockedColor);
     p.setCosmetic(true);
-    p.setWidth(3);
+    p.setWidth(5);
     painter->setPen(p);
     
     painter->drawPath(shape());
@@ -99,7 +101,18 @@ void Waypoint::writeToMissionPlan(QJsonArray& navArray) const
 {
     QJsonObject waypointObject;
     writeBehaviorsToMissionPlanObject(waypointObject);
+    
+    waypointObject["pathtype"] = "waypoint";
+    
+    QJsonArray wpNavArray;
+    writeNavToMissionPlan(wpNavArray);
+    waypointObject["nav"] = wpNavArray;
+    
+    navArray.append(waypointObject);
+}
 
+void Waypoint::writeNavToMissionPlan(QJsonArray& navArray) const
+{
     QJsonObject navObject;
 
     QJsonObject orientationObject;
@@ -114,10 +127,7 @@ void Waypoint::writeToMissionPlan(QJsonArray& navArray) const
     positionObject["longitude"] = m_location.longitude();
     navObject["position"] = positionObject;
     
-    waypointObject["nav"] = navObject;
-    QJsonObject navItem;
-    navItem["waypoint"] = waypointObject;
-    navArray.append(navItem);
+    navArray.append(navObject);
 }
 
 
