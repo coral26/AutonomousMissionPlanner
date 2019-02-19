@@ -59,12 +59,14 @@ void ROSLink::connectROS()
             m_sog_subscriber = m_node->subscribe("/udp/sog",10, &ROSLink::sogCallback, this);
             m_coverage_subscriber = m_node->subscribe("/udp/coverage", 10, &ROSLink::coverageCallback, this);
             m_ping_subscriber = m_node->subscribe("/udp/mbes_ping", 10, &ROSLink::pingCallback, this);
+            m_current_path_subscriber = m_node->subscribe("/udp/project11/mission_manager/current_path", 10, &ROSLink::currentPathCallback, this);
             
-            m_active_publisher = m_node->advertise<std_msgs::Bool>("/udp/active",1);
-            m_helmMode_publisher = m_node->advertise<std_msgs::String>("/udp/helm_mode",1);
-            m_wpt_updates_publisher = m_node->advertise<std_msgs::String>("/udp/wpt_updates",1);
-            m_loiter_updates_publisher = m_node->advertise<std_msgs::String>("/udp/loiter_updates",1);
-            m_mission_plan_publisher = m_node->advertise<std_msgs::String>("/udp/mission_plan",1);
+            //m_active_publisher = m_node->advertise<std_msgs::Bool>("/udp/active",1);
+            //m_helmMode_publisher = m_node->advertise<std_msgs::String>("/udp/helm_mode",1);
+            //m_wpt_updates_publisher = m_node->advertise<std_msgs::String>("/udp/wpt_updates",1);
+            //m_loiter_updates_publisher = m_node->advertise<std_msgs::String>("/udp/loiter_updates",1);
+            //m_mission_plan_publisher = m_node->advertise<std_msgs::String>("/udp/mission_plan",1);
+            m_send_command_publisher = m_node->advertise<std_msgs::String>("/send_command",1);
             m_spinner->start();
             m_watchdog_timer->start(500);
             emit rosConnected(true);
@@ -116,6 +118,7 @@ void ROSLink::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, Q
     p.setWidth(4);
     painter->setPen(p);
     painter->drawPath(viewShape());
+    painter->drawPath(currentPathShape());
 
     p.setColor(Qt::darkBlue);
     p.setWidth(5);
@@ -159,7 +162,7 @@ QPainterPath ROSLink::shape() const
     ret.addPath(baseShape());
     ret.addPath(coverageShape());
     ret.addPath(pingsShape());
-        
+    ret.addPath(currentPathShape());
     return ret;
 }
 
@@ -330,6 +333,25 @@ QPainterPath ROSLink::viewShape() const
     return ret;
 }
 
+QPainterPath ROSLink::currentPathShape() const
+{
+    QPainterPath ret;
+    
+    if(!m_local_current_path.empty())
+    {
+        auto p = m_local_current_path.begin();
+        ret.moveTo(*p);
+        p++;
+        while(p != m_local_current_path.end())
+        {
+            ret.lineTo(*p);
+            p++;
+        }
+    }
+
+    return ret;
+}
+
 QPainterPath ROSLink::coverageShape() const
 {
     QPainterPath ret;
@@ -386,9 +408,12 @@ void ROSLink::drawTriangle(QPainterPath& path, const QGeoCoordinate& location, d
     QGeoCoordinate llcorner = location.atDistanceAndAzimuth(15*scale,heading_degrees-150);
     QGeoCoordinate lrcorner = location.atDistanceAndAzimuth(15*scale,heading_degrees+150);
 
-    QPointF ltip = geoToPixel(tip,autonomousVehicleProject())-m_local_reference_position;
-    QPointF lllocal = geoToPixel(llcorner,autonomousVehicleProject())-m_local_reference_position;
-    QPointF lrlocal = geoToPixel(lrcorner,autonomousVehicleProject())-m_local_reference_position;
+//     QPointF ltip = geoToPixel(tip,autonomousVehicleProject())-m_local_reference_position;
+//     QPointF lllocal = geoToPixel(llcorner,autonomousVehicleProject())-m_local_reference_position;
+//     QPointF lrlocal = geoToPixel(lrcorner,autonomousVehicleProject())-m_local_reference_position;
+    QPointF ltip = geoToPixel(tip,autonomousVehicleProject());
+    QPointF lllocal = geoToPixel(llcorner,autonomousVehicleProject());
+    QPointF lrlocal = geoToPixel(lrcorner,autonomousVehicleProject());
 
     path.moveTo(ltip);
     path.lineTo(lllocal);
@@ -407,11 +432,16 @@ void ROSLink::drawShipOutline(QPainterPath& path, const QGeoCoordinate& location
         QGeoCoordinate rkink = lrcorner.atDistanceAndAzimuth(length*.8,heading_degrees);
         QGeoCoordinate lkink = llcorner.atDistanceAndAzimuth(length*.8,heading_degrees);
         QGeoCoordinate bow = ulcorner.atDistanceAndAzimuth(width/2.0,90+heading_degrees);
-        QPointF lllocal = geoToPixel(llcorner,autonomousVehicleProject())-m_local_reference_position;
-        QPointF lrlocal = geoToPixel(lrcorner,autonomousVehicleProject())-m_local_reference_position;
-        QPointF lkinkl = geoToPixel(lkink,autonomousVehicleProject())-m_local_reference_position;
-        QPointF rkinkl = geoToPixel(rkink,autonomousVehicleProject())-m_local_reference_position;
-        QPointF bowl = geoToPixel(bow,autonomousVehicleProject())-m_local_reference_position;
+//         QPointF lllocal = geoToPixel(llcorner,autonomousVehicleProject())-m_local_reference_position;
+//         QPointF lrlocal = geoToPixel(lrcorner,autonomousVehicleProject())-m_local_reference_position;
+//         QPointF lkinkl = geoToPixel(lkink,autonomousVehicleProject())-m_local_reference_position;
+//         QPointF rkinkl = geoToPixel(rkink,autonomousVehicleProject())-m_local_reference_position;
+//         QPointF bowl = geoToPixel(bow,autonomousVehicleProject())-m_local_reference_position;
+        QPointF lllocal = geoToPixel(llcorner,autonomousVehicleProject());
+        QPointF lrlocal = geoToPixel(lrcorner,autonomousVehicleProject());
+        QPointF lkinkl = geoToPixel(lkink,autonomousVehicleProject());
+        QPointF rkinkl = geoToPixel(rkink,autonomousVehicleProject());
+        QPointF bowl = geoToPixel(bow,autonomousVehicleProject());
         
         path.moveTo(lllocal);
         path.lineTo(lrlocal);
@@ -462,7 +492,8 @@ void ROSLink::bearingCallback(const std_msgs::Float32::ConstPtr& message)
 
 void ROSLink::sogCallback(const geometry_msgs::TwistStamped::ConstPtr& message)
 {
-    QMetaObject::invokeMethod(this,"updateSog", Qt::QueuedConnection, Q_ARG(qreal, message->twist.linear.x));  
+    qreal sog = sqrt(message->twist.linear.x*message->twist.linear.x+message->twist.linear.y*message->twist.linear.y);
+    QMetaObject::invokeMethod(this,"updateSog", Qt::QueuedConnection, Q_ARG(qreal, sog));  
 }
 
 void ROSLink::updateSog(qreal sog)
@@ -470,7 +501,7 @@ void ROSLink::updateSog(qreal sog)
     // 1852m per NM
     m_sog = sog*1.9438;
     m_sog_history.append(m_sog);
-    if(m_sog_history.length() > 20)
+    if(m_sog_history.length() > 200)
         m_sog_history.pop_front();
     qreal sog_sum = 0;
     for(auto s: m_sog_history)
@@ -606,18 +637,20 @@ void ROSLink::sendWaypoints(const QList<QGeoCoordinate>& waypoints)
         updates << position[0] << ", " << position[1] << ":";
     }
     
-    std_msgs::String rosUpdates;
-    rosUpdates.data = updates.str();
-    if(m_node)
-        m_wpt_updates_publisher.publish(rosUpdates);
+    sendCommand("moos_wpt_updates "+updates.str());
+//     std_msgs::String rosUpdates;
+//     rosUpdates.data = updates.str();
+//     if(m_node)
+//         m_wpt_updates_publisher.publish(rosUpdates);
 }
 
 void ROSLink::sendMissionPlan(const QString& plan)
 {
-    std_msgs::String mp;
-    mp.data = plan.toStdString();
-    if(m_node)
-        m_mission_plan_publisher.publish(mp);
+    sendCommand("mission_plan "+plan.toStdString());
+//     std_msgs::String mp;
+//     mp.data = plan.toStdString();
+//     if(m_node)
+//         m_mission_plan_publisher.publish(mp);
 }
 
 
@@ -638,10 +671,11 @@ void ROSLink::sendLoiter(const QGeoCoordinate& loiterLocation)
     qDebug() << "ecef: " << ecef[0] << ", " << ecef[1] << ", " << ecef[2];
     gz4d::Point<double> position = geoReference.toLocal(ecef);
     updates << position[0] << ", " << position[1] << ":";
-    
-    std_msgs::String rosUpdates;
-    rosUpdates.data = updates.str();
-    m_loiter_updates_publisher.publish(rosUpdates);
+
+    sendCommand("moos_loiter_updates "+updates.str());
+//     std_msgs::String rosUpdates;
+//     rosUpdates.data = updates.str();
+//     m_loiter_updates_publisher.publish(rosUpdates);
 }
 
 void ROSLink::sendGoto(const QGeoCoordinate& gotoLocation)
@@ -655,21 +689,23 @@ void ROSLink::sendWaypointIndexUpdate(int waypoint_index)
 {
     std::stringstream updates;
     updates << "currix=" << waypoint_index;
-    
-    std_msgs::String rosUpdates;
-    rosUpdates.data = updates.str();
-    if(m_node)
-        m_wpt_updates_publisher.publish(rosUpdates);
+        
+    sendCommand("moos_wpt_updates "+updates.str());
+//     std_msgs::String rosUpdates;
+//     rosUpdates.data = updates.str();
+//     if(m_node)
+//         m_wpt_updates_publisher.publish(rosUpdates);
 }
 
 
 void ROSLink::updateLocation(const QGeoCoordinate& location)
 {
     prepareGeometryChange();
-    if(m_have_local_reference)
+    //if(m_have_local_reference)
     {
         m_location_history.push_back(location);
-        m_local_location_history.push_back(geoToPixel(location,autonomousVehicleProject())-m_local_reference_position);
+        //m_local_location_history.push_back(geoToPixel(location,autonomousVehicleProject())-m_local_reference_position);
+        m_local_location_history.push_back(geoToPixel(location,autonomousVehicleProject()));
         while (m_local_location_history.size()>500)
             m_local_location_history.pop_front();
         m_location = location;
@@ -695,10 +731,11 @@ void ROSLink::updatePosmvLocation(const QGeoCoordinate& location)
 void ROSLink::updateBaseLocation(const QGeoCoordinate& location)
 {
     prepareGeometryChange();
-    if(m_have_local_reference)
+//    if(m_have_local_reference)
     {
         m_base_location_history.push_back(location);
-        m_local_base_location_history.push_back(geoToPixel(location,autonomousVehicleProject())-m_local_reference_position);
+        //m_local_base_location_history.push_back(geoToPixel(location,autonomousVehicleProject())-m_local_reference_position);
+        m_local_base_location_history.push_back(geoToPixel(location,autonomousVehicleProject()));
         while (m_local_base_location_history.size()>100)
             m_local_base_location_history.pop_front();
         m_base_location = location;
@@ -765,31 +802,50 @@ void ROSLink::updateBackground(BackgroundRaster *bgr)
 
 void ROSLink::recalculatePositions()
 {
-    setPos(geoToPixel(m_origin,autonomousVehicleProject()));
+    prepareGeometryChange();
+    //setPos(geoToPixel(m_origin,autonomousVehicleProject()));
+    setPos(0,0);
+    m_local_location_history.clear();
+    for(auto l: m_location_history)
+    {
+        m_local_location_history.push_back(geoToPixel(l,autonomousVehicleProject()));            
+    }
     if(m_have_local_reference)
     {
         m_local_reference_position = geoToPixel(m_origin,autonomousVehicleProject());
-        m_local_location_history.clear();
-        for(auto l: m_location_history)
-        {
-            m_local_location_history.push_back(geoToPixel(l,autonomousVehicleProject())-m_local_reference_position);            
-        }
         m_local_posmv_location_history.clear();
         for(auto l: m_posmv_location_history)
         {
             m_local_posmv_location_history.push_back(geoToPixel(l,autonomousVehicleProject())-m_local_reference_position);            
-        }
-        m_local_base_location_history.clear();
-        for(auto l: m_base_location_history)
-        {
-            m_local_base_location_history.push_back(geoToPixel(l,autonomousVehicleProject())-m_local_reference_position);            
         }
         for(auto contactList: m_contacts)
         {
             for(auto contact: contactList.second)
                 contact->location_local = geoToPixel(contact->location,autonomousVehicleProject())-m_local_reference_position;
         }
+        
+        updateViewPoint(m_view_point, geoToPixel(m_view_point,autonomousVehicleProject())-m_local_reference_position, m_view_point_active);
+        
+        QList<QPointF> local_view_polygon;
+        for(auto p: m_view_polygon)
+        {
+            local_view_polygon.append(geoToPixel(p,autonomousVehicleProject())-m_local_reference_position);
+        }
+        updateViewPolygon(m_view_polygon,local_view_polygon,m_view_polygon_active);
+        
+        QList<QPointF> local_view_seglist;
+        for(auto p: m_view_seglist)
+        {
+            local_view_seglist.append(geoToPixel(p,autonomousVehicleProject())-m_local_reference_position);
+        }
+        updateViewSeglist(m_view_seglist,local_view_seglist,m_view_seglist_active);
     }
+    m_local_base_location_history.clear();
+    for(auto l: m_base_location_history)
+    {
+        m_local_base_location_history.push_back(geoToPixel(l,autonomousVehicleProject()));            
+    }
+    update();
 }
 
 
@@ -801,9 +857,13 @@ bool ROSLink::active() const
 void ROSLink::setActive(bool active)
 {
     m_active = active;
-    std_msgs::Bool b;
-    b.data = active;
-    m_active_publisher.publish(b);
+    if(m_active)
+        sendCommand("active True");
+    else
+        sendCommand("active False");
+//     std_msgs::Bool b;
+//     b.data = active;
+//     m_active_publisher.publish(b);
 }
 
 const std::string& ROSLink::helmMode() const
@@ -814,9 +874,18 @@ const std::string& ROSLink::helmMode() const
 void ROSLink::setHelmMode(const std::string& helmMode)
 {
     m_helmMode = helmMode;
-    std_msgs::String hm;
-    hm.data = helmMode;
-    m_helmMode_publisher.publish(hm);
+    sendCommand("helm_mode "+helmMode);
+//     std_msgs::String hm;
+//     hm.data = helmMode;
+//     m_helmMode_publisher.publish(hm);
+}
+
+void ROSLink::sendCommand(const std::string& command)
+{
+    std_msgs::String cmd;
+    cmd.data = command;
+    qDebug() << command.c_str();
+    m_send_command_publisher.publish(cmd);
 }
 
 AutonomousVehicleProject * ROSLink::autonomousVehicleProject() const
@@ -996,19 +1065,42 @@ void ROSLink::coverageCallback(const geographic_msgs::GeoPath::ConstPtr& message
     QMetaObject::invokeMethod(this,"updateCoverage", Qt::QueuedConnection, Q_ARG(QList<QList<QGeoCoordinate> >, coverage), Q_ARG(QList<QPolygonF>, local_coverage));
 }
 
-void ROSLink::pingCallback(const geographic_msgs::GeoPath::ConstPtr& message)
+void ROSLink::currentPathCallback(const geographic_msgs::GeoPath::ConstPtr& message)
+{
+    QList<QGeoCoordinate> current_path;
+    QList<QPointF> local_current_path;
+    for(auto p: message->poses)
+    {
+        QGeoCoordinate gc;
+        gc.setLatitude(p.pose.position.latitude);
+        gc.setLongitude(p.pose.position.longitude);
+        current_path.append(gc);
+        local_current_path.append(geoToPixel(current_path.back(),autonomousVehicleProject()));
+    }
+    QMetaObject::invokeMethod(this,"updateCurrentPath", Qt::QueuedConnection, Q_ARG(QList<QGeoCoordinate>, current_path), Q_ARG(QList<QPointF>, local_current_path));
+}
+
+void ROSLink::updateCurrentPath(QList<QGeoCoordinate> current_path, QList<QPointF> local_current_path)
+{
+    prepareGeometryChange();
+    m_current_path = current_path;
+    m_local_current_path = local_current_path;
+    update();   
+}
+
+void ROSLink::pingCallback(const sensor_msgs::PointCloud::ConstPtr& message)
 {
     QList<QGeoCoordinate> ping;
     QList<QPointF> local_ping;
-    for(auto gp: message->poses)
-    {
-        QGeoCoordinate gc;
-        gc.setLatitude(gp.pose.position.latitude);
-        gc.setLongitude(gp.pose.position.longitude);
-        ping.append(gc);
-        local_ping.append(geoToPixel(gc,autonomousVehicleProject())-m_local_reference_position);
-    }
-    QMetaObject::invokeMethod(this,"addPing", Qt::QueuedConnection, Q_ARG(QList<QGeoCoordinate>, ping), Q_ARG(QList<QPointF>, local_ping));
+//     for(auto gp: message->poses)
+//     {
+//         QGeoCoordinate gc;
+//         gc.setLatitude(gp.pose.position.latitude);
+//         gc.setLongitude(gp.pose.position.longitude);
+//         ping.append(gc);
+//         local_ping.append(geoToPixel(gc,autonomousVehicleProject())-m_local_reference_position);
+//     }
+//     QMetaObject::invokeMethod(this,"addPing", Qt::QueuedConnection, Q_ARG(QList<QGeoCoordinate>, ping), Q_ARG(QList<QPointF>, local_ping));
 }
 
 

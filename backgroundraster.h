@@ -14,8 +14,8 @@ class BackgroundRaster: public MissionItem, public QGraphicsItem, public Georefe
     Q_INTERFACES(QGraphicsItem)
 public:
     BackgroundRaster(const QString &fname = QString(), QObject *parent = 0, QGraphicsItem *parentItem =0);
-    QRectF boundingRect() const;
-    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
+    QRectF boundingRect() const override;
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
     QPixmap topLevelPixmap() const;
     QString const &filename() const;
 
@@ -28,6 +28,8 @@ public:
     qreal mapScale() const;
     
     bool canAcceptChildType(const std::string & childType) const override;
+    
+    bool valid() const;
 
 public slots:
     void updateMapScale(qreal scale); 
@@ -38,6 +40,7 @@ private:
     QString m_filename;
     qreal m_pixel_size; // size of a pixel in meters.
     qreal m_map_scale;
+    bool m_valid;
 
 };
 

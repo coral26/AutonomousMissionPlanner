@@ -6,7 +6,7 @@
 #include <QDebug>
 
 BackgroundRaster::BackgroundRaster(const QString &fname, QObject *parent, QGraphicsItem *parentItem)
-    : MissionItem(parent), QGraphicsItem(parentItem), m_filename(fname)
+    : MissionItem(parent), QGraphicsItem(parentItem), m_filename(fname),m_valid(false)
 {
     GDALDataset * dataset = reinterpret_cast<GDALDataset*>(GDALOpen(fname.toStdString().c_str(),GA_ReadOnly));
     if (dataset)
@@ -22,10 +22,12 @@ BackgroundRaster::BackgroundRaster(const QString &fname, QObject *parent, QGraph
         qDebug() << "pixel size: " << m_pixel_size;
         
         QImage image(width,height,QImage::Format_ARGB32);
-
+        image.fill(Qt::black);
+        
         for(int bandNumber = 1; bandNumber <= dataset->GetRasterCount(); bandNumber++)
         {
             GDALRasterBand * band = dataset->GetRasterBand(bandNumber);
+            
 
             GDALColorTable *colorTable = band->GetColorTable();
 
@@ -48,8 +50,23 @@ BackgroundRaster::BackgroundRaster(const QString &fname, QObject *parent, QGraph
                     }
                     else
                     {
-                        scanline[i*4+3] = 255; // hack to make sure alpha is solid in case no alpha channel is present
-                        scanline[i*4 + bandNumber-1] = buffer[i];
+                        if(band->GetColorInterpretation() == GCI_GrayIndex)
+                        {
+                            scanline[i*4+0] = buffer[i];
+                            scanline[i*4+1] = buffer[i];
+                            scanline[i*4+2] = buffer[i];
+                        }
+                        if(band->GetColorInterpretation() == GCI_RedBand)
+                            scanline[i*4+2] = buffer[i];
+                        if(band->GetColorInterpretation() == GCI_GreenBand)
+                            scanline[i*4+1] = buffer[i];
+                        if(band->GetColorInterpretation() == GCI_BlueBand)
+                            scanline[i*4+0] = buffer[i];
+                        if(band->GetColorInterpretation() == GCI_AlphaBand)
+                            scanline[i*4+3] = buffer[i];
+
+                        //scanline[i*4+3] = 255; // hack to make sure alpha is solid in case no alpha channel is present
+                        //scanline[i*4 + 2-(bandNumber-1)] = buffer[i];
                     }
                 }
             }
@@ -60,7 +77,13 @@ BackgroundRaster::BackgroundRaster(const QString &fname, QObject *parent, QGraph
         {
             backgroundImages[i] = QPixmap::fromImage(image.scaledToWidth(width/float(i),Qt::SmoothTransformation));
         }
+        m_valid = true;
     }
+}
+
+bool BackgroundRaster::valid() const
+{
+    return m_valid;
 }
 
 QRectF BackgroundRaster::boundingRect() const

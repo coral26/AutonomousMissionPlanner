@@ -1,6 +1,8 @@
 #include "surveyarea.h"
 #include "waypoint.h"
 #include <QPainter>
+#include <QJsonObject>
+#include <QJsonArray>
 
 SurveyArea::SurveyArea(MissionItem *parent) :GeoGraphicsMissionItem(parent)
 {
@@ -86,6 +88,8 @@ QList<Waypoint *> SurveyArea::waypoints() const
 
 QList<QList<QGeoCoordinate> > SurveyArea::getLines() const
 {
+    QList<QList<QGeoCoordinate> > ret;
+    return ret;
 }
 
 void SurveyArea::write(QJsonObject& json) const
@@ -94,6 +98,21 @@ void SurveyArea::write(QJsonObject& json) const
 
 void SurveyArea::writeToMissionPlan(QJsonArray& navArray) const
 {
+    QJsonObject navItem;
+    navItem["pathtype"] = "area";
+    writeBehaviorsToMissionPlanObject(navItem);
+    QJsonArray pathNavArray;
+    auto children = childItems();
+    for(auto child: children)
+    {
+        if(child->type() == GeoGraphicsItem::WaypointType)
+        {
+            Waypoint *wp = qgraphicsitem_cast<Waypoint*>(child);
+            wp->writeNavToMissionPlan(pathNavArray);
+        }
+    }
+    navItem["nav"] = pathNavArray;
+    navArray.append(navItem);
 }
 
 void SurveyArea::read(const QJsonObject& json)

@@ -105,9 +105,17 @@ void AutonomousVehicleProject::openBackground(const QString &fname)
 {
     beginInsertRows(indexFromItem(m_currentGroup),m_currentGroup->childMissionItems().size(),m_currentGroup->childMissionItems().size());
     BackgroundRaster *bgr = new BackgroundRaster(fname, m_currentGroup);
-    bgr->setObjectName(fname);
-    setCurrentBackground(bgr);
-    endInsertRows();
+    if(bgr->valid())
+    {        
+        bgr->setObjectName(fname);
+        setCurrentBackground(bgr);
+        endInsertRows();
+    }
+    else
+    {
+        endInsertRows();
+        deleteItem(bgr);
+    }
 }
 
 void AutonomousVehicleProject::openGeometry(const QString& fname)
@@ -224,7 +232,8 @@ SurveyPattern * AutonomousVehicleProject::createSurveyPattern()
 {
     SurveyPattern *sp = potentialParentItemFor("SurveyPattern")->createMissionItem<SurveyPattern>("pattern");
     connect(this,&AutonomousVehicleProject::currentPlaformUpdated,sp,&SurveyPattern::onCurrentPlatformUpdated);
-
+    connect(this,&AutonomousVehicleProject::backgroundUpdated,sp,&SurveyPattern::updateBackground);
+  
     return sp;
 
 }
@@ -233,7 +242,7 @@ SurveyPattern *AutonomousVehicleProject::addSurveyPattern(QGeoCoordinate positio
 {
     SurveyPattern *sp = createSurveyPattern();
     sp->setStartLocation(position);
-    connect(this,&AutonomousVehicleProject::backgroundUpdated,sp,&SurveyPattern::updateBackground);
+//    connect(this,&AutonomousVehicleProject::backgroundUpdated,sp,&SurveyPattern::updateBackground);
     return sp;
 }
 
@@ -333,6 +342,11 @@ QJsonDocument AutonomousVehicleProject::generateMissionPlan(const QModelIndex& i
     QJsonDocument plan;
     QJsonObject topLevel;
     QJsonObject defaultParameters;
+    Platform *platform = currentPlatform();
+    if(platform)
+    {
+        defaultParameters["defaultspeed_ms"] = platform->speed()*0.514444; // knots to m/s
+    }
     topLevel["DEFAULT_PARAMETERS"] = defaultParameters;
     QJsonArray navArray;
     item->writeToMissionPlan(navArray);
@@ -357,19 +371,19 @@ void AutonomousVehicleProject::exportMissionPlan(const QModelIndex& index)
 
 void AutonomousVehicleProject::sendToROS(const QModelIndex& index)
 {
-    MissionItem *mi = itemFromIndex(index);
-    QList<QGeoCoordinate> wps;
-    auto lines = mi->getLines();
-    for (auto l: lines)
-        for (auto p: l)
-            wps.append(p);
-
-#ifdef AMP_ROS
-    if(m_ROSLink)
-    {
-        m_ROSLink->sendWaypoints(wps);
-    }
-#endif
+     MissionItem *mi = itemFromIndex(index);
+//     QList<QGeoCoordinate> wps;
+//     auto lines = mi->getLines();
+//     for (auto l: lines)
+//         for (auto p: l)
+//             wps.append(p);
+// 
+// #ifdef AMP_ROS
+//     if(m_ROSLink)
+//     {
+//         m_ROSLink->sendWaypoints(wps);
+//     }
+// #endif
     // mission_plan format
     QJsonDocument plan = generateMissionPlan(index);
     
@@ -426,6 +440,8 @@ void AutonomousVehicleProject::deleteItem(MissionItem *item)
 
 void AutonomousVehicleProject::setCurrent(const QModelIndex &index)
 {
+    auto last_selected = m_currentSelected;
+    
     m_currentSelected = itemFromIndex(index);
     if(m_currentSelected)
     {
@@ -446,7 +462,18 @@ void AutonomousVehicleProject::setCurrent(const QModelIndex &index)
             m_currentGroup = g;
         else
             m_currentGroup = m_root;
+        GeoGraphicsMissionItem * ggmi = qobject_cast<GeoGraphicsMissionItem*>(m_currentSelected);
+        if(ggmi)
+            ggmi->update();
     }
+    GeoGraphicsMissionItem * ggmi = qobject_cast<GeoGraphicsMissionItem*>(last_selected);
+    if(ggmi)
+        ggmi->update();
+}
+
+MissionItem * AutonomousVehicleProject::currentSelected() const
+{
+    return m_currentSelected;
 }
 
 void AutonomousVehicleProject::setCurrentBackground(BackgroundRaster *bgr)
