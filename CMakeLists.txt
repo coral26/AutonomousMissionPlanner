@@ -1,6 +1,21 @@
 cmake_minimum_required(VERSION 3.5.1)
+project(camp)
 
-project(AutonomousMissionPlanner)
+if(CMAKE_COMPILER_IS_GNUCXX)
+    add_definitions(-std=c++11)
+endif(CMAKE_COMPILER_IS_GNUCXX)
+
+option(AMP_USE_ROS "Build ROS components" ON)
+
+if(AMP_USE_ROS)
+    find_package(catkin REQUIRED COMPONENTS roscpp marine_msgs geographic_visualization_msgs rosgraph_msgs)
+    include_directories(${catkin_INCLUDE_DIRS})
+    add_definitions(-DAMP_ROS)
+    
+    catkin_package(
+    )
+
+endif()
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -19,18 +34,14 @@ endif(Qt5Widgets_FOUND)
 find_package(GDAL REQUIRED)
 include_directories(${GDAL_INCLUDE_DIR})
 
-if(CMAKE_COMPILER_IS_GNUCXX)
-    add_definitions(-std=c++11)
-endif(CMAKE_COMPILER_IS_GNUCXX)
+find_package(Doxygen)
 
-option(AMP_USE_ROS "Build ROS components")
-
-if(AMP_USE_ROS)
-    find_package(catkin REQUIRED COMPONENTS roscpp marine_msgs geographic_visualization_msgs)
-    include_directories(${catkin_INCLUDE_DIRS})
-    add_definitions(-DAMP_ROS)
+if (DOXYGEN_FOUND)
+    doxygen_add_docs(
+        docs
+        ${PROJECT_SOURCE_DIR}
+    )
 endif()
-
 
 set(SOURCES
     main.cpp
@@ -106,6 +117,7 @@ set ( RESOURCES
 )
 
 add_executable(AutonomousMissionPlanner ${HEADERS} ${SOURCES} ${RESOURCES})
+add_dependencies(AutonomousMissionPlanner ${catkin_EXPORTED_TARGETS})
 
 qt5_use_modules(AutonomousMissionPlanner Widgets Positioning Svg Test)
 

@@ -19,10 +19,12 @@ public:
     ~MainWindow();
 
     void open(QString const &fname);
+    void setWorkspace(QString const &dir);
 public slots:
 
     void setCurrent(QModelIndex &index);
     void onROSConnected(bool connected);
+    
 
 private slots:
     void on_actionOpen_triggered();
@@ -39,14 +41,19 @@ private slots:
     void on_actionGroup_triggered();
     void on_actionImport_triggered();
     void on_actionBehavior_triggered();
+    void on_actionRadar_triggered();
 
 private:
     Ui::MainWindow *ui;
     AutonomousVehicleProject *project;
+    QString m_workspace_path;
 
     void exportHypack() const;
     void exportMissionPlan() const;
     void sendToROS() const;
+    void appendMission() const;
+    void prependMission() const;
+    void updateMission() const;
 };
 
 #endif // MAINWINDOW_H

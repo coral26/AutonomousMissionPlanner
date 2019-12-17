@@ -80,8 +80,8 @@ QList<Waypoint *> SurveyArea::waypoints() const
     for(auto child: children)
     {
         Waypoint *wp = qobject_cast<Waypoint*>(child);
-            if(wp)
-                ret.append(wp);
+        if(wp)
+            ret.append(wp);
     }
     return ret;
 }
@@ -94,6 +94,18 @@ QList<QList<QGeoCoordinate> > SurveyArea::getLines() const
 
 void SurveyArea::write(QJsonObject& json) const
 {
+    MissionItem::write(json);
+    json["type"] = "SurveyArea";
+
+    QJsonArray childrenArray;
+    for(MissionItem *item: childMissionItems())
+    {
+        QJsonObject miObject;
+        item->write(miObject);
+        childrenArray.append(miObject);
+    }
+    
+    json["children"] = childrenArray;
 }
 
 void SurveyArea::writeToMissionPlan(QJsonArray& navArray) const
@@ -127,5 +139,7 @@ void SurveyArea::updateProjectedPoints()
 
 bool SurveyArea::canAcceptChildType(const std::string& childType) const
 {
-    return childType == "Waypoint";
+    if (childType == "Waypoint") return true;
+    if (childType == "SurveyPattern") return true;
+    return false;
 }

@@ -7,6 +7,7 @@
 #include "sensor_msgs/NavSatFix.h"
 #include "marine_msgs/NavEulerStamped.h"
 #include "marine_msgs/Heartbeat.h"
+#include "marine_msgs/RadarSectorStamped.h"
 #include "ros/ros.h"
 #include "marine_msgs/Contact.h"
 #include "std_msgs/String.h"
@@ -35,7 +36,9 @@ public:
     float dimension_to_stbd; 
     float dimension_to_port;
     float dimension_to_bow;
-    float dimension_to_stern; 
+    float dimension_to_stern;
+    float cog;
+    float sog;
 };
 
 namespace geoviz
@@ -71,6 +74,17 @@ namespace geoviz
     };
 }
 
+struct RadarSectorDisplay: public QObject
+{
+    Q_OBJECT
+public:
+    double range;
+    std::map<int,QPainterPath> paths;
+    
+    double start_angle;
+    double heading;
+    LocationPosition location;
+};
 
 class ROSLink : public QObject, public GeoGraphicsItem
 {
@@ -119,19 +133,29 @@ public slots:
     void updateCoverage(QList<QList<QGeoCoordinate> > coverage, QList<QPolygonF> local_coverage);
     void addPing(QList<QGeoCoordinate> ping, QList<QPointF> local_ping);
     void updateDisplayItem(geoviz::Item *item);
+    void updateRadarSector(RadarSectorDisplay *sector);
 
     void recalculatePositions();
     void addAISContact(ROSAISContact *c);
-    void sendWaypoints(QList<QGeoCoordinate> const &waypoints);
+    
     void sendMissionPlan(QString const &plan);
+    void appendMission(QString const &plan);
+    void prependMission(QString const &plan);
+    void updateMission(QString const &plan);
+    
     void sendHover(QGeoCoordinate const &targetLocation);
     void sendGoto(QGeoCoordinate const &targetLocation);
+    void sendNextItem();
+    void restartMission();
+    void sendLookAt(QGeoCoordinate const &targetLocation);
+    void sendLookAtMode(std::string const &mode);
     void sendGotoLine(int waypoint_index);
     void sendStartLine(int waypoint_index);
     void connectROS();
     void updateHeartbeatTimes(ros::Time const &last_heartbeat_timestamp, ros::Time const &last_heartbeat_receive_time);
     void watchdogUpdate();
     void updateSog(qreal sog);
+    void showRadar(bool show);
     
 private:
     void geoPointStampedCallback(const geographic_msgs::GeoPointStamped::ConstPtr& message);
@@ -141,6 +165,7 @@ private:
     void baseHeadingCallback(const marine_msgs::NavEulerStamped::ConstPtr& message);
     void contactCallback(const marine_msgs::Contact::ConstPtr& message);
     void heartbeatCallback(const marine_msgs::Heartbeat::ConstPtr& message);
+    void missionStatusCallback(const marine_msgs::Heartbeat::ConstPtr& message);
     void posmvOrientationCallback(const marine_msgs::NavEulerStamped::ConstPtr& message);
     void posmvPositionCallback(const sensor_msgs::NavSatFix::ConstPtr& message);
     void rangeCallback(const std_msgs::Float32::ConstPtr& message);
@@ -149,6 +174,7 @@ private:
     void coverageCallback(const geographic_msgs::GeoPath::ConstPtr& message);
     void pingCallback(const sensor_msgs::PointCloud::ConstPtr& message);
     void geoVizDisplayCallback(const geographic_visualization_msgs::GeoVizItem::ConstPtr& message);
+    void radarCallback(const marine_msgs::RadarSectorStamped::ConstPtr& message);
     
     void drawTriangle(QPainterPath &path, QGeoCoordinate const &location, double heading_degrees, double scale=1.0) const;
     void drawShipOutline(QPainterPath &path, QGeoCoordinate const &location, double heading_degrees, float dimension_to_bow, float dimension_to_port, float dimension_to_stbd, float dimension_to_stern) const;
@@ -165,6 +191,7 @@ private:
     ros::Subscriber m_base_heading_subscriber;
     ros::Subscriber m_ais_subscriber;
     ros::Subscriber m_heartbeat_subscriber;
+    ros::Subscriber m_mission_status_subscriber;
     ros::Subscriber m_posmv_position;
     ros::Subscriber m_posmv_orientation;
     ros::Subscriber m_range_subscriber;
@@ -173,8 +200,12 @@ private:
     ros::Subscriber m_coverage_subscriber;
     ros::Subscriber m_ping_subscriber;
     ros::Subscriber m_display_subscriber;
+    ros::Subscriber m_radar_subscriber;
+    ros::Subscriber m_clock_subscriber;
     
     ros::Publisher m_send_command_publisher;
+    ros::Publisher m_look_at_publisher;
+    ros::Publisher m_look_at_mode_publisher;
     
     ros::AsyncSpinner *m_spinner;
     QGeoCoordinate m_location;
@@ -192,6 +223,12 @@ private:
     double m_heading;
     double m_posmv_heading;
     double m_base_heading;
+    
+    float m_base_dimension_to_stbd; 
+    float m_base_dimension_to_port;
+    float m_base_dimension_to_bow;
+    float m_base_dimension_to_stern; 
+    
     std::string m_helmMode;
     
     typedef std::list<ROSAISContact*> ContactList;
@@ -223,6 +260,15 @@ private:
     
     std::map<std::string,std::shared_ptr<geoviz::Item> > m_display_items;
 
+    std::map<double,std::shared_ptr<RadarSectorDisplay> > m_radar_sectors;
+    QPixmap m_radar_pixmap;
+    double m_radar_scale;
+    LocationPosition m_radar_location;
+    bool m_show_radar;
+
+    static int s_radar_image_size;
+    static int s_radar_half_image_size;
+    
     ros::Time m_last_heartbeat_timestamp;
     ros::Time m_last_heartbeat_receive_time;
     
